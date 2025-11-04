@@ -1,5 +1,8 @@
 const { useState, useEffect } = React;
 
+// SUBSTITUA pelo seu Client ID real do Google Cloud Console
+const GOOGLE_CLIENT_ID = '908560175195-lf7chg3ulkvuv2pobjvi0lo9vv03661h.apps.googleusercontent.com';
+
 // Templates de exemplo
 const templates = [
   {
@@ -85,6 +88,8 @@ function App() {
   const [currentCV, setCurrentCV] = useState({...templates[0].data, templateId: templates[0].id});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const handleResize = () => {
@@ -96,6 +101,80 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Inicializar Google Sign-In
+  useEffect(() => {
+    const initializeGoogleSignIn = () => {
+      try {
+        if (window.google && window.google.accounts) {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleSignIn,
+            auto_select: false,
+            cancel_on_tap_outside: false
+          });
+          
+          // Verificar se há usuário logado
+          const savedUser = localStorage.getItem('cvbuilder_user');
+          if (savedUser) {
+            try {
+              setUser(JSON.parse(savedUser));
+            } catch (e) {
+              localStorage.removeItem('cvbuilder_user');
+            }
+          }
+          setIsLoading(false);
+        } else {
+          // Tentar novamente em 500ms se o Google SDK não estiver carregado
+          setTimeout(initializeGoogleSignIn, 500);
+        }
+      } catch (error) {
+        console.error('Erro ao inicializar Google SDK:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    initializeGoogleSignIn();
+  }, []);
+
+  const handleGoogleSignIn = (response) => {
+    try {
+      const payload = JSON.parse(atob(response.credential.split('.')[1]));
+      const userData = {
+        id: payload.sub,
+        name: payload.name,
+        email: payload.email,
+        picture: payload.picture
+      };
+      
+      setUser(userData);
+      localStorage.setItem('cvbuilder_user', JSON.stringify(userData));
+      
+      // Preencher dados pessoais automaticamente
+      setCurrentCV(prev => ({
+        ...prev,
+        personal: {
+          ...prev.personal,
+          name: userData.name,
+          email: userData.email
+        }
+      }));
+    } catch (error) {
+      console.error('Erro ao processar login do Google:', error);
+    }
+  };
+
+  const handleSignOut = () => {
+    setUser(null);
+    localStorage.removeItem('cvbuilder_user');
+    try {
+      if (window.google && window.google.accounts) {
+        window.google.accounts.id.disableAutoSelect();
+      }
+    } catch (error) {
+      console.log('Google SDK não disponível para logout');
+    }
+  };
 
   const downloadPDF = () => {
     const element = document.getElementById('cv-preview');
@@ -109,6 +188,24 @@ function App() {
     html2pdf().set(opt).from(element).save();
   };
 
+  if (isLoading) {
+    return (
+      <div className="app">
+        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh'}}>
+          <div>Carregando...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="app">
+        <LoginScreen onSignIn={handleGoogleSignIn} />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <Header 
@@ -118,6 +215,8 @@ function App() {
         setMobileMenuOpen={setMobileMenuOpen}
         isMobile={isMobile}
         downloadPDF={downloadPDF}
+        user={user}
+        onSignOut={handleSignOut}
       />
       
       <div className="content">
@@ -172,8 +271,92 @@ function App() {
   );
 }
 
+// Componente LoginScreen
+function LoginScreen({ onSignIn }) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (window.google && window.google.accounts) {
+        window.google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          {
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular',
+            logo_alignment: 'left'
+          }
+        );
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: 'white',
+      textAlign: 'center',
+      padding: '2rem'
+    }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '20px',
+        padding: '3rem',
+        maxWidth: '500px',
+        width: '100%'
+      }}>
+        <h1 style={{
+          fontSize: '3rem',
+          fontWeight: 'bold',
+          marginBottom: '1rem',
+          background: 'linear-gradient(45deg, #fff, #f0f0f0)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent'
+        }}>
+          CV Builder
+        </h1>
+        
+        <p style={{
+          fontSize: '1.2rem',
+          marginBottom: '2rem',
+          opacity: 0.9,
+          lineHeight: '1.6'
+        }}>
+          Crie currículos profissionais de forma rápida e fácil.
+          Faça login com sua conta Google para começar!
+        </p>
+        
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '2rem'
+        }}>
+          <div id="google-signin-button"></div>
+        </div>
+        
+        <div style={{
+          fontSize: '0.9rem',
+          opacity: 0.7,
+          marginTop: '2rem'
+        }}>
+          ✓ Seus dados ficam seguros<br/>
+          ✓ Preenchimento automático<br/>
+          ✓ Acesso rápido e fácil
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Componente Header
-function Header({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenuOpen, isMobile, downloadPDF }) {
+function Header({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenuOpen, isMobile, downloadPDF, user, onSignOut }) {
   const menuItems = [
     { id: 'templates', label: 'Templates', icon: '' },
     { id: 'editor', label: 'Editor', icon: '' },
@@ -183,7 +366,9 @@ function Header({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenuOpen, is
   return (
     <>
       <header className="header">
-        <div className="logo">CV Builder</div>
+        <div className="logo">
+          <img src="assets/CV Builder Logo Transparente.jpg" alt="CV Builder" className="logo-img" />
+        </div>
         
         {isMobile ? (
           <button 
@@ -206,6 +391,18 @@ function Header({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenuOpen, is
             <button className="btn-primary" onClick={downloadPDF}>
               Baixar PDF
             </button>
+            
+            <div className="user-menu">
+              <img 
+                src={user.picture} 
+                alt={user.name}
+                className="user-avatar"
+              />
+              <span className="user-name">{user.name}</span>
+              <button className="btn-secondary" onClick={onSignOut}>
+                Sair
+              </button>
+            </div>
           </nav>
         )}
       </header>
@@ -232,6 +429,19 @@ function Header({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenuOpen, is
             }}
           >
             PDF
+          </button>
+          <div className="mobile-user-info">
+            <img src={user.picture} alt={user.name} className="user-avatar" />
+            <span>{user.name}</span>
+          </div>
+          <button
+            className="mobile-nav-btn"
+            onClick={() => {
+              onSignOut();
+              setMobileMenuOpen(false);
+            }}
+          >
+            Sair
           </button>
         </div>
       )}
