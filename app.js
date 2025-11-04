@@ -1,9 +1,9 @@
 const { useState, useEffect } = React;
 
-// SUBSTITUA pelo seu Client ID real do Google Cloud Console
+// ID real do Google Cloud Console
 const GOOGLE_CLIENT_ID = '908560175195-lf7chg3ulkvuv2pobjvi0lo9vv03661h.apps.googleusercontent.com';
 
-// Templates de exemplo
+
 const templates = [
   {
     id: 1,
@@ -82,7 +82,7 @@ const templates = [
   }
 ];
 
-// Componente principal
+// Componentes
 function App() {
   const [activeTab, setActiveTab] = useState('templates');
   const [currentCV, setCurrentCV] = useState({...templates[0].data, templateId: templates[0].id});
@@ -102,7 +102,7 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Inicializar Google Sign-In
+  //  Google Sign-In
   useEffect(() => {
     const initializeGoogleSignIn = () => {
       try {
@@ -114,7 +114,7 @@ function App() {
             cancel_on_tap_outside: false
           });
           
-          // Verificar se há usuário logado
+          //  usuário logado ?
           const savedUser = localStorage.getItem('cvbuilder_user');
           if (savedUser) {
             try {
@@ -125,7 +125,7 @@ function App() {
           }
           setIsLoading(false);
         } else {
-          // Tentar novamente em 500ms se o Google SDK não estiver carregado
+          // Tentar novamente em 500ms se o Google SDK não estiver carregando
           setTimeout(initializeGoogleSignIn, 500);
         }
       } catch (error) {
@@ -150,7 +150,7 @@ function App() {
       setUser(userData);
       localStorage.setItem('cvbuilder_user', JSON.stringify(userData));
       
-      // Preencher dados pessoais automaticamente
+      // dados pessoais automaticamente
       setCurrentCV(prev => ({
         ...prev,
         personal: {
@@ -471,13 +471,17 @@ function TemplateSelector({ templates, currentCV, setCurrentCV, setActiveTab }) 
             }}
           >
             <div className="template-preview">
-              <div className="preview-header"></div>
-              <div className="preview-line" style={{width: '90%'}}></div>
-              <div className="preview-line blue"></div>
-              <div className="preview-line" style={{width: '80%'}}></div>
-              <div className="preview-line" style={{width: '70%'}}></div>
-              <div className="preview-line blue" style={{width: '50%'}}></div>
-              <div className="preview-line" style={{width: '85%'}}></div>
+              <img 
+                src={`assets/${template.id === 1 ? 'moderno' : template.id === 2 ? 'elegante' : 'minimalista'}.JPG`}
+                alt={`Preview ${template.name}`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'top center',
+                  borderRadius: '8px'
+                }}
+              />
             </div>
             
             <h3 style={{fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '0.5rem'}}>
